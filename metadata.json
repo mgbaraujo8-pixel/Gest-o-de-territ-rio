@@ -1,0 +1,5 @@
+{
+  "name": "Mapeamentos de Equipamentos do território",
+  "description": "Sistema de mapeamento e visualização de equipamentos públicos e sociais no território.",
+  "requestFramePermissions": ["geolocation"]
+}
