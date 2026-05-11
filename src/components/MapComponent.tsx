@@ -4,11 +4,12 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import L from 'leaflet';
 import 'leaflet.markercluster';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Dispatch, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import { Filter, Map as MapIcon, List, Plus, Edit2, X, Save, MapPin, Maximize2, Minimize2, Navigation, Search, CheckSquare, Square, User, ClipboardList } from 'lucide-react';
 import { motion } from 'motion/react';
-import { allEquipments, Equipment, Visit } from '../data/equipments';
+import { Equipment, Visit } from '../data/equipments';
+import { supabase } from '../lib/supabase';
 
 // Fix for default marker icons in Leaflet with React
 // @ts-ignore
@@ -231,18 +232,31 @@ const MarkerClusterer = ({ data, onEdit }: { data: Equipment[], onEdit: (e: Equi
   return null;
 };
 
-export default function MapComponent({ onToggleExpand, isExpanded, onCountChange, onVisitRecorded, visitHistory }: { 
+export default function MapComponent({ 
+  onToggleExpand, 
+  isExpanded, 
+  onCountChange, 
+  onVisitRecorded, 
+  visitHistory,
+  externalEquipments,
+  onEquipmentsChange
+}: { 
   onToggleExpand: () => void, 
   isExpanded: boolean,
   onCountChange?: (count: number) => void,
   onVisitRecorded?: (visit: Visit) => void,
-  visitHistory?: Visit[]
+  visitHistory?: Visit[],
+  externalEquipments: Equipment[],
+  onEquipmentsChange: Dispatch<SetStateAction<Equipment[]>>
 }) {
-  const [equipments, setEquipments] = useState<Equipment[]>(allEquipments);
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [selectedNeighborhood, setSelectedNeighborhood] = useState("Todos");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  
+  // Use parent's equipments
+  const equipments = externalEquipments;
+  const setEquipments = onEquipmentsChange;
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -287,16 +301,41 @@ export default function MapComponent({ onToggleExpand, isExpanded, onCountChange
     });
   }, [selectedCategory, selectedNeighborhood, searchQuery, equipments]);
 
-  const handleVisitSave = (e: any) => {
+  const handleVisitSave = async (e: any) => {
     e.preventDefault();
     if (!activeVisit || !onVisitRecorded) return;
 
-    const newVisit: Visit = {
-      ...activeVisit,
-      id: Date.now(),
-    } as Visit;
+    const visitData = {
+      equipment_id: activeVisit.equipmentId,
+      date: activeVisit.date,
+      professional: activeVisit.professional,
+      intern: activeVisit.intern || 'Nenhuma',
+      age_groups: activeVisit.ageGroups,
+      objectives: activeVisit.objectives,
+      other_objective: activeVisit.otherObjective || '',
+      synthesis: activeVisit.synthesis
+    };
 
-    onVisitRecorded(newVisit);
+    const { data, error } = await supabase
+      .from('visits')
+      .insert([visitData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving visit:', error);
+      return;
+    }
+
+    if (data) {
+      const newVisit: Visit = {
+        ...activeVisit,
+        id: data.id,
+      } as Visit;
+
+      onVisitRecorded(newVisit);
+    }
+    
     setIsVisitModalOpen(false);
     setActiveVisit(null);
   };
@@ -318,20 +357,63 @@ export default function MapComponent({ onToggleExpand, isExpanded, onCountChange
     }
   }, [filteredData, onCountChange]);
 
-  const handleSave = (e: any) => {
+  const handleSave = async (e: any) => {
     e.preventDefault();
     if (!editingEquip) return;
 
-    const newEquip = {
-      ...editingEquip,
-      id: editingEquip.id || Date.now(),
-      coords: editingEquip.coords || FORTALEZA_COORDS,
-    } as Equipment;
+    const equipData = {
+      name: editingEquip.name,
+      policy: editingEquip.policy,
+      type: editingEquip.type,
+      address: editingEquip.address,
+      neighborhood: editingEquip.neighborhood,
+      organ: editingEquip.organ,
+      contact: editingEquip.contact,
+      reference: editingEquip.reference,
+      observations: editingEquip.observations,
+      latitude: editingEquip.coords ? editingEquip.coords[0] : FORTALEZA_COORDS[0],
+      longitude: editingEquip.coords ? editingEquip.coords[1] : FORTALEZA_COORDS[1]
+    };
 
     if (editingEquip.id) {
-      setEquipments(prev => prev.map(item => item.id === editingEquip.id ? newEquip : item));
+      const { data, error } = await supabase
+        .from('equipments')
+        .update(equipData)
+        .eq('id', editingEquip.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating equipment:', error);
+        return;
+      }
+
+      if (data) {
+        const updated: Equipment = {
+          ...data,
+          coords: [data.latitude, data.longitude]
+        };
+        setEquipments((prev: Equipment[]) => prev.map(item => item.id === editingEquip.id ? updated : item));
+      }
     } else {
-      setEquipments(prev => [newEquip, ...prev]);
+      const { data, error } = await supabase
+        .from('equipments')
+        .insert([equipData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating equipment:', error);
+        return;
+      }
+
+      if (data) {
+        const created: Equipment = {
+          ...data,
+          coords: [data.latitude, data.longitude]
+        };
+        setEquipments((prev: Equipment[]) => [created, ...prev]);
+      }
     }
 
     setIsModalOpen(false);

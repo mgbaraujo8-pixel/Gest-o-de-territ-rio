@@ -1,9 +1,10 @@
-import { useState, useMemo, FormEvent } from 'react';
+import { useState, useMemo, FormEvent, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Navigation, Info, Menu, Search, Filter, Map as MapIcon, List, Maximize2, Minimize2, Calendar, BarChart3, Route, Clock, ChevronRight, Plus, ArrowRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
 import MapComponent from './components/MapComponent';
-import { Visit, allEquipments, Referral } from './data/equipments';
+import { Visit, Equipment, Referral } from './data/equipments';
+import { supabase } from './lib/supabase';
 
 const SocialWorkIcon = ({ className }: { className?: string }) => (
   <svg 
@@ -63,9 +64,66 @@ type Tab = 'territorios' | 'agendamento' | 'relatorios' | 'planejamento';
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('territorios');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [equipCount, setEquipCount] = useState(0);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch initial data
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      
+      // Fetch Equipments
+      const { data: equipsData } = await supabase
+        .from('equipments')
+        .select('*')
+        .order('name');
+      
+      if (equipsData) {
+        setEquipments(equipsData.map(e => ({
+          ...e,
+          coords: [e.latitude, e.longitude]
+        })));
+        setEquipCount(equipsData.length);
+      }
+
+      // Fetch Visits
+      const { data: visitsData } = await supabase
+        .from('visits')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (visitsData) {
+        setVisits(visitsData.map(v => ({
+          ...v,
+          equipmentId: v.equipment_id,
+          ageGroups: v.age_groups,
+          objectives: v.objectives,
+          otherObjective: v.other_objective
+        })));
+      }
+
+      // Fetch Referrals
+      const { data: referralsData } = await supabase
+        .from('referrals')
+        .select('*')
+        .order('date', { ascending: false });
+      
+      if (referralsData) {
+        setReferrals(referralsData.map(r => ({
+          ...r,
+          personName: r.person_name,
+          targetEquipmentId: r.target_equipment_id
+        })));
+      }
+      
+      setLoading(false);
+    }
+
+    fetchData();
+  }, []);
   
   // New Referral Form State
   const [newReferral, setNewReferral] = useState<Partial<Referral>>({
@@ -86,11 +144,11 @@ export default function App() {
   // Report Data
   const policyStats = useMemo(() => {
     const categories: Record<string, number> = {};
-    allEquipments.forEach(eq => {
+    equipments.forEach(eq => {
       categories[eq.policy] = (categories[eq.policy] || 0) + 1;
     });
     return Object.entries(categories).map(([name, value]) => ({ name, value }));
-  }, []);
+  }, [equipments]);
 
   const ageData = useMemo(() => {
     const ageGroups: Record<string, number> = {
@@ -111,21 +169,43 @@ export default function App() {
     return ageData.reduce((acc, v) => acc + v.value, 0);
   }, [ageData]);
 
-  const handleAddReferral = (e: FormEvent) => {
+  const handleAddReferral = async (e: FormEvent) => {
     e.preventDefault();
     if (!newReferral.personName || !newReferral.targetEquipmentId) return;
 
-    const referral: Referral = {
-      id: Date.now(),
-      personName: newReferral.personName,
-      targetEquipmentId: Number(newReferral.targetEquipmentId),
-      date: new Date().toLocaleDateString('pt-BR'),
+    const referralData = {
+      person_name: newReferral.personName,
+      target_equipment_id: Number(newReferral.targetEquipmentId),
+      date: new Date().toISOString().split('T')[0],
       professional: newReferral.professional || 'Natalia Rocha',
       reason: newReferral.reason || '',
       status: 'Ativo'
     };
 
-    setReferrals(prev => [referral, ...prev]);
+    const { data, error } = await supabase
+      .from('referrals')
+      .insert([referralData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding referral:', error);
+      return;
+    }
+
+    if (data) {
+      const newRef: Referral = {
+        id: data.id,
+        personName: data.person_name,
+        targetEquipmentId: data.target_equipment_id,
+        date: data.date,
+        professional: data.professional,
+        reason: data.reason,
+        status: data.status as 'Ativo' | 'Concluído'
+      };
+      setReferrals(prev => [newRef, ...prev]);
+    }
+
     setNewReferral({
       personName: '',
       targetEquipmentId: 1,
@@ -137,6 +217,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1A1C1E] font-sans selection:bg-emerald-200">
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-[100] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="w-12 h-12 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin mb-4" />
+          <p className="text-sm font-bold text-slate-600 uppercase tracking-widest animate-pulse">Carregando dados...</p>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className={`fixed top-0 left-0 right-0 z-40 bg-white/70 backdrop-blur-xl border-b border-slate-200/50 px-6 py-4 transition-all duration-500 ${isExpanded ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -281,8 +369,10 @@ export default function App() {
                 onToggleExpand={() => setIsExpanded(!isExpanded)} 
                 isExpanded={isExpanded} 
                 onCountChange={setEquipCount}
-                onVisitRecorded={(visit: Visit) => setVisits(prev => [...prev, visit])}
+                onVisitRecorded={(visit: Visit) => setVisits(prev => [visit, ...prev])}
                 visitHistory={visits}
+                externalEquipments={equipments}
+                onEquipmentsChange={setEquipments}
               />
             )}
             {activeTab === 'agendamento' && (
@@ -345,7 +435,7 @@ export default function App() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                   <div className="bg-slate-50 p-6 rounded-2xl text-center">
-                    <div className="text-4xl font-bold text-slate-800">{allEquipments.length}</div>
+                    <div className="text-4xl font-bold text-slate-800">{equipments.length}</div>
                     <div className="text-xs uppercase font-bold opacity-40 mt-1">Equipamentos</div>
                   </div>
                   <div className="bg-slate-50 p-6 rounded-2xl text-center">
@@ -438,7 +528,7 @@ export default function App() {
                             onChange={e => setNewReferral({...newReferral, targetEquipmentId: Number(e.target.value)})}
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-200 outline-none text-sm transition-all appearance-none"
                           >
-                            {allEquipments.sort((a,b) => a.name.localeCompare(b.name)).map(eq => (
+                            {equipments.sort((a,b) => a.name.localeCompare(b.name)).map(eq => (
                               <option key={eq.id} value={eq.id}>{eq.name} ({eq.neighborhood})</option>
                             ))}
                           </select>
@@ -473,7 +563,7 @@ export default function App() {
                       ) : (
                         <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden divide-y divide-slate-100">
                           {referrals.map(ref => {
-                            const equipment = allEquipments.find(e => e.id === ref.targetEquipmentId);
+                            const equipment = equipments.find(e => e.id === ref.targetEquipmentId);
                             return (
                               <div key={ref.id} className="p-6 hover:bg-slate-50 transition-colors group">
                                 <div className="flex justify-between items-start">
