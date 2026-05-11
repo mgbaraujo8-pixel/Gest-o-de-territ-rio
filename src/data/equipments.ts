@@ -6,8 +6,8 @@ export interface Visit {
   objectives: string[]; // ['Articulação e fortalecimento da rede', 'Mapeamento territorial', 'Alinhamento de fluxos de encaminhamento', 'Identificação de parcerias intersetoriais', 'Outro']
   otherObjective?: string;
   synthesis: string;
-  professional: string; // 'Natalia Rocha', 'Luciana Matias'
-  intern?: string; // 'Monaliza Oliveira', 'Gabriela Souza'
+  professionals: string[]; // 'Natalia Rocha', 'Luciana Matias'
+  interns: string[]; // ['Monaliza Oliveira', 'Gabriela Souza']
 }
 
 export interface Referral {
@@ -32,11 +32,12 @@ export interface Equipment {
   contact?: string;
   reference?: string;
   observations?: string;
+  operatingHours?: string;
 }
 
 export const allEquipments: Equipment[] = [
   { id: 1, name: "Conselho Tutelar III", policy: "Proteção Social", type: "Conselho Tutelar", address: "R. Silveira Filho, 935", neighborhood: "João XXIII", coords: [-3.7728, -38.5785], organ: "FUNCI" },
-  { id: 2, name: "Secretária Executiva Regional 11", policy: "Gestão", type: "Secretaria Executiva", address: "R. Rio Grande do Sul, 860", neighborhood: "Panamericano", coords: [-3.7567, -38.5647], organ: "SEGER" },
+  { id: 2, name: "Secretária Executiva Regional 11", policy: "Gestão", type: "Secretaria Regional", address: "Rua Rio Grande do Sul, 860", neighborhood: "Panamericano", coords: [-3.7547, -38.5663], organ: "Prefeitura de Fortaleza" },
   { id: 3, name: "UAPS Cícera Carla Almeida", policy: "Saúde", type: "UBS", address: "R. Júlio Braga, 1331", neighborhood: "Bonsucesso", coords: [-3.7732, -38.5832], organ: "SMS" },
   { id: 4, name: "UPAS César Cals de Oliveira Filho", policy: "Saúde", type: "UBS", address: "R. Pernambuco, 3172", neighborhood: "Pici", coords: [-3.7478, -38.5808], organ: "SMS" },
   { id: 5, name: "UPAS Eliézer Studart", policy: "Saúde", type: "UBS", address: "R. Tomás Cavalcante, 545", neighborhood: "Autran Nunes", coords: [-3.7545, -38.5956], organ: "SMS" },
@@ -128,7 +129,7 @@ export const allEquipments: Equipment[] = [
   { id: 91, name: "EMTI Prof. Ademar Nunes Batista", policy: "Educação", type: "Escola", address: "1159, 100", neighborhood: "Conjunto Ceará I e II", coords: [-3.7622, -38.6119], organ: "SME" },
   { id: 92, name: "EMEIF Padre Arimateia Diniz", policy: "Educação", type: "Escola", address: "R. 814, s/n", neighborhood: "Conjunto Ceará I e II", coords: [-3.7683, -38.5991], organ: "SME" },
   { id: 93, name: "EEM Doutor Gentil Barreira", policy: "Educação", type: "Escola", address: "Rua 202 - D, S/N", neighborhood: "Conjunto Ceará I e II", coords: [-3.7649, -38.6081], organ: "SME" },
-  { id: 94, name: "EMEIEF São Raimundo", policy: "Educação", type: "Escola", address: "R. Alexandre Baraúna, 1450", neighborhood: "Rodolfo Teófilo", coords: [-3.7453, -38.5544], organ: "SME" },
+  { id: 94, name: "Conselho Tutelar XI", policy: "Proteção Social", type: "Conselho Tutelar", address: "Rua Rio Grande do Sul, 860", neighborhood: "Panamericano", coords: [-3.7547, -38.5663], organ: "FUNCI" },
   { id: 95, name: "EEFM Félix de Azevedo", policy: "Educação", type: "Escola", address: "Rua Monsenhor Furtado, 757", neighborhood: "Rodolfo Teófilo", coords: [-3.7454, -38.5486], organ: "SME" },
   { id: 96, name: "Micro Parque Santa Luzia", policy: "Esporte e Lazer", type: "Parque", address: "R. 1002", neighborhood: "Conjunto Ceará II", coords: [-3.7731, -38.6189], organ: "SEUMA" },
   { id: 97, name: "Microparque Aconchego", policy: "Esporte e Lazer", type: "Parque", address: "R. 218 B", neighborhood: "Conjunto Ceará I", coords: [-3.7644, -38.6074], organ: "SEUMA" },
@@ -158,7 +159,7 @@ export const allEquipments: Equipment[] = [
   { id: 121, name: "Instituto dos Olhos do Ceará", policy: "Terceiro Setor", type: "Instituto", address: "Rua 444, 42", neighborhood: "Conjunto Ceará I", coords: [-3.7623, -38.6054], organ: "Privado" },
   { id: 122, name: "Instituto Seara Viva", policy: "Terceiro Setor", type: "Instituto", address: "R. 832, 35", neighborhood: "Conjunto Ceará I", coords: [-3.7682, -38.6035], organ: "Privado" },
   { id: 123, name: "CEJA Adelino Alcântara Filho", policy: "Educação", type: "Escola", address: "R. 612, S/N", neighborhood: "Conjunto Ceará I", coords: [-3.7649, -38.6029], organ: "SME" },
-  { id: 124, name: "Liceu do Conjunto Ceará", policy: "Educação", type: "Escola", address: "R. 1139 A, 10", neighborhood: "Conjunto Ceará I", coords: [-3.7581, -38.6099], organ: "SME" },
+  { id: 124, name: "Escola Municipal João XXIII", policy: "Educação", type: "Escola", address: "R. Prof. Heribaldo Costa, 1331", neighborhood: "João XXIII", coords: [-3.7630, -38.5850], organ: "SME" },
   { id: 125, name: "CCDH Conjunto Ceará", policy: "Esporte e Lazer", type: "Associação", address: "Av. Alanis Maria Laurindo de Oliveira, 461", neighborhood: "Conjunto Ceará I", coords: [-3.7658, -38.6054], organ: "SECULT CE" },
   { id: 126, name: "Projeto Trampolim", policy: "Terceiro Setor", type: "OSC", address: "R. Xavier de Oliveira, 52", neighborhood: "Amadeu Furtado", coords: [-3.7465, -38.5579], organ: "Privado" },
   { id: 127, name: "AFECE", policy: "Terceiro Setor", type: "Associação", address: "Rodolfo Teófilo", neighborhood: "Rodolfo Teófilo", coords: [-3.7447, -38.5456], organ: "Privado" },

@@ -4,9 +4,9 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import L from 'leaflet';
 import 'leaflet.markercluster';
-import { useState, useMemo, useEffect, Dispatch, SetStateAction } from 'react';
+import React, { useState, useMemo, useEffect, Dispatch, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
-import { Filter, Map as MapIcon, List, Plus, Edit2, X, Save, MapPin, Maximize2, Minimize2, Navigation, Search, CheckSquare, Square, User, ClipboardList } from 'lucide-react';
+import { Filter, Map as MapIcon, List, Plus, Edit2, X, Save, MapPin, Maximize2, Minimize2, Navigation, Search, CheckSquare, Square, User, ClipboardList, Trash2, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Equipment, Visit } from '../data/equipments';
 import { supabase } from '../lib/supabase';
@@ -130,7 +130,13 @@ const getCategoryColor = (policy: string) => {
 };
 
 // Component to handle marker clustering with fine-tuned settings
-const MarkerClusterer = ({ data, onEdit }: { data: Equipment[], onEdit: (e: Equipment) => void }) => {
+const MarkerClusterer = ({ data, onEdit, visitHistory, onDeleteEquip, onDeleteVisit }: { 
+  data: Equipment[], 
+  onEdit: (e: Equipment) => void,
+  visitHistory: Visit[],
+  onDeleteEquip: (id: number) => void,
+  onDeleteVisit: (id: number) => void
+}) => {
   const map = useMap();
 
   useEffect(() => {
@@ -172,7 +178,31 @@ const MarkerClusterer = ({ data, onEdit }: { data: Equipment[], onEdit: (e: Equi
           <p><span style="font-weight: bold; color: #1e293b;">Órgão:</span> ${loc.organ}</p>
           ${loc.contact ? `<p><span style="font-weight: bold; color: #1e293b;">Contato:</span> ${loc.contact}</p>` : ''}
           ${loc.reference ? `<p><span style="font-weight: bold; color: #1e293b;">Referência:</span> ${loc.reference}</p>` : ''}
-          ${loc.observations ? `<p><span style="font-weight: bold; color: #1e293b;">Observações:</span> ${loc.observations}</p>` : ''}
+          ${loc.operatingHours ? `<p><span style="font-weight: bold; color: #1e293b;">Horário:</span> ${loc.operatingHours}</p>` : ''}
+          ${loc.observations ? `<p style="margin-top: 4px; padding: 6px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #cbd5e1; color: #475569; font-style: italic; font-size: 11px;">${loc.observations}</p>` : ''}
+        </div>
+
+        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; pt-4">
+          <h4 style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Informações Registradas</h4>
+          <div style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+            ${(visitHistory || []).filter(v => v.equipmentId === loc.id).length > 0 
+              ? (visitHistory || []).filter(v => v.equipmentId === loc.id).map(v => `
+                  <div style="background: #f8fafc; padding: 8px; border-radius: 6px; border: 1px solid #f1f5f9; position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <span style="font-size: 10px; font-weight: bold; color: #057a55;">${v.date}</span>
+                      <button id="del-visit-${v.id}" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 2px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                      </button>
+                    </div>
+                    <p style="font-size: 10px; color: #475569; margin: 0;">${v.synthesis || 'Sem síntese'}</p>
+                    <div style="font-size: 9px; color: #94a3b8; margin-top: 2px;">
+                      Prof: ${v.professionals?.join(', ') || 'Não informado'} ${v.interns?.length ? `• Estag: ${v.interns.join(', ')}` : ''}
+                    </div>
+                  </div>
+                `).join('')
+              : '<p style="font-size: 10px; color: #94a3b8; font-style: italic;">Nenhuma informação registrada.</p>'
+            }
+          </div>
         </div>
         
         <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
@@ -180,6 +210,17 @@ const MarkerClusterer = ({ data, onEdit }: { data: Equipment[], onEdit: (e: Equi
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
             Adicionar Informação
           </button>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button id="edit-btn-${loc.id}" style="padding: 8px; background: #f1f5f9; border-radius: 8px; font-size: 11px; font-weight: bold; color: #64748b; border: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+              Editar
+            </button>
+            <button id="del-equip-${loc.id}" style="padding: 8px; background: #fee2e2; border-radius: 8px; font-size: 11px; font-weight: bold; color: #ef4444; border: 1px solid #fecaca; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              Excluir
+            </button>
+          </div>
 
           <a 
             href="https://www.google.com/maps/dir/?api=1&destination=${loc.coords[0]},${loc.coords[1]}" 
@@ -190,11 +231,6 @@ const MarkerClusterer = ({ data, onEdit }: { data: Equipment[], onEdit: (e: Equi
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
             Como Chegar
           </a>
-          
-          <button id="edit-btn-${loc.id}" style="width: 100%; padding: 8px; background: #f1f5f9; border-radius: 8px; font-size: 11px; font-weight: bold; color: #64748b; border: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-            Editar Equipamento
-          </button>
         </div>
       `;
 
@@ -211,11 +247,29 @@ const MarkerClusterer = ({ data, onEdit }: { data: Equipment[], onEdit: (e: Equi
         const visitBtn = document.getElementById(`visit-btn-${loc.id}`);
         if (visitBtn) {
           visitBtn.onclick = () => {
-            // This will be handled in MapComponent via state
             window.dispatchEvent(new CustomEvent('open-visit-form', { detail: loc }));
             marker.closePopup();
           };
         }
+
+        const delEquipBtn = document.getElementById(`del-equip-${loc.id}`);
+        if (delEquipBtn) {
+          delEquipBtn.onclick = () => {
+            onDeleteEquip(loc.id as number);
+            marker.closePopup();
+          };
+        }
+
+        // Setup individual visit deletes
+        (visitHistory || []).filter(v => v.equipmentId === loc.id).forEach(v => {
+          const delVisitBtn = document.getElementById(`del-visit-${v.id}`);
+          if (delVisitBtn) {
+            delVisitBtn.onclick = () => {
+              onDeleteVisit(v.id as number);
+              marker.closePopup();
+            };
+          }
+        });
       });
       
       marker.bindPopup(popupDiv, { className: 'custom-popup' });
@@ -237,17 +291,23 @@ export default function MapComponent({
   isExpanded, 
   onCountChange, 
   onVisitRecorded, 
+  onVisitDeleted,
+  onEquipDeleted,
   visitHistory,
   externalEquipments,
-  onEquipmentsChange
+  onEquipmentsChange,
+  refreshData
 }: { 
   onToggleExpand: () => void, 
   isExpanded: boolean,
   onCountChange?: (count: number) => void,
-  onVisitRecorded?: (visit: Visit) => void,
-  visitHistory?: Visit[],
-  externalEquipments: Equipment[],
-  onEquipmentsChange: Dispatch<SetStateAction<Equipment[]>>
+  onVisitRecorded?: (visit: Visit) => void;
+  onVisitDeleted?: (id: number) => void;
+  onEquipDeleted?: (id: number) => void;
+  visitHistory?: Visit[];
+  externalEquipments: Equipment[];
+  onEquipmentsChange: Dispatch<SetStateAction<Equipment[]>>;
+  refreshData?: () => void;
 }) {
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [selectedNeighborhood, setSelectedNeighborhood] = useState("Todos");
@@ -274,10 +334,10 @@ export default function MapComponent({
         date: new Date().toISOString().split('T')[0],
         ageGroups: [],
         objectives: [],
-        professional: 'Natalia Rocha',
-        intern: 'Nenhuma',
+        professionals: [],
+        interns: [],
         synthesis: '',
-      });
+      } as any);
       setIsVisitModalOpen(true);
     };
     window.addEventListener('open-visit-form', handler);
@@ -301,47 +361,49 @@ export default function MapComponent({
     });
   }, [selectedCategory, selectedNeighborhood, searchQuery, equipments]);
 
-  const handleVisitSave = async (e: any) => {
+  const handleVisitSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeVisit || !onVisitRecorded) return;
+    if (!activeVisit) return;
 
-    const visitData = {
-      equipment_id: activeVisit.equipmentId,
-      date: activeVisit.date,
-      professional: activeVisit.professional,
-      intern: activeVisit.intern || 'Nenhuma',
-      age_groups: activeVisit.ageGroups,
-      objectives: activeVisit.objectives,
-      other_objective: activeVisit.otherObjective || '',
-      synthesis: activeVisit.synthesis
-    };
+    console.log('Iniciando salvamento da visita:', activeVisit);
 
-    const { data, error } = await supabase
-      .from('visits')
-      .insert([visitData])
-      .select()
-      .single();
+    try {
+      const visitToSave = {
+        equipment_id: activeVisit.equipmentId,
+        date: activeVisit.date,
+        age_groups: activeVisit.ageGroups,
+        objectives: activeVisit.objectives,
+        other_objective: activeVisit.otherObjective,
+        synthesis: activeVisit.synthesis,
+        professional: activeVisit.professionals,
+        interns: activeVisit.interns
+      };
 
-    if (error) {
-      console.error('Error saving visit:', error);
-      return;
+      console.log('Dados formatados para o Supabase:', visitToSave);
+
+      const { data, error } = await supabase
+        .from('visits')
+        .insert([visitToSave]);
+
+      if (error) throw error;
+
+      console.log('Visita salva com sucesso!', data);
+      setIsVisitModalOpen(false);
+      if (refreshData) await refreshData();
+      alert('Visita registrada com sucesso!');
+    } catch (error) {
+      console.error('Erro detalhado ao salvar visita:', error);
+      alert('Erro ao salvar visita. Verifique o console para mais detalhes.');
     }
-
-    if (data) {
-      const newVisit: Visit = {
-        ...activeVisit,
-        id: data.id,
-      } as Visit;
-
-      onVisitRecorded(newVisit);
-    }
-    
-    setIsVisitModalOpen(false);
-    setActiveVisit(null);
   };
 
-  const professionals = ['Natalia Rocha', 'Luciana Matias'];
-  const interns = ['Nenhuma', 'Monaliza Oliveira', 'Gabriela Souza'];
+  const [professionals, setProfessionals] = useState(['Natalia', 'Luciana']);
+  const [isEditingProfs, setIsEditingProfs] = useState(false);
+  const [newProfName, setNewProfName] = useState('');
+  
+  const [interns, setInterns] = useState(['Monaliza Oliveira', 'Gabriela Souza']);
+  const [isEditingInterns, setIsEditingInterns] = useState(false);
+  const [newInternName, setNewInternName] = useState('');
   const ageGroups = ['Criança', 'Adolescente', 'Adulto', 'Idoso'];
   const visitObjectives = [
     'Articulação e fortalecimento da rede',
@@ -360,65 +422,47 @@ export default function MapComponent({
   const handleSave = async (e: any) => {
     e.preventDefault();
     if (!editingEquip) return;
+    
+    try {
+      const equipData = {
+        name: editingEquip.name,
+        policy: editingEquip.policy,
+        type: editingEquip.type,
+        address: editingEquip.address,
+        neighborhood: editingEquip.neighborhood,
+        latitude: editingEquip.coords ? editingEquip.coords[0] : -3.7319,
+        longitude: editingEquip.coords ? editingEquip.coords[1] : -38.5267,
+        organ: editingEquip.organ,
+        contact: editingEquip.contact,
+        reference: editingEquip.reference,
+        observations: editingEquip.observations,
+        operating_hours: editingEquip.operatingHours
+      };
 
-    const equipData = {
-      name: editingEquip.name,
-      policy: editingEquip.policy,
-      type: editingEquip.type,
-      address: editingEquip.address,
-      neighborhood: editingEquip.neighborhood,
-      organ: editingEquip.organ,
-      contact: editingEquip.contact,
-      reference: editingEquip.reference,
-      observations: editingEquip.observations,
-      latitude: editingEquip.coords ? editingEquip.coords[0] : FORTALEZA_COORDS[0],
-      longitude: editingEquip.coords ? editingEquip.coords[1] : FORTALEZA_COORDS[1]
-    };
-
-    if (editingEquip.id) {
-      const { data, error } = await supabase
-        .from('equipments')
-        .update(equipData)
-        .eq('id', editingEquip.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating equipment:', error);
-        return;
+      if (editingEquip.id) {
+        const { error } = await supabase
+          .from('equipments')
+          .update(equipData)
+          .eq('id', editingEquip.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('equipments')
+          .insert([equipData]);
+          
+        if (error) throw error;
       }
-
-      if (data) {
-        const updated: Equipment = {
-          ...data,
-          coords: [data.latitude, data.longitude]
-        };
-        setEquipments((prev: Equipment[]) => prev.map(item => item.id === editingEquip.id ? updated : item));
-      }
-    } else {
-      const { data, error } = await supabase
-        .from('equipments')
-        .insert([equipData])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating equipment:', error);
-        return;
-      }
-
-      if (data) {
-        const created: Equipment = {
-          ...data,
-          coords: [data.latitude, data.longitude]
-        };
-        setEquipments((prev: Equipment[]) => [created, ...prev]);
-      }
+      
+      if (refreshData) await refreshData();
+      setIsModalOpen(false);
+      setEditingEquip(null);
+      setIsSelectingCoords(false);
+      alert('Equipamento salvo com sucesso!');
+    } catch (err) {
+      console.error('Erro ao salvar equipamento:', err);
+      alert('Ocorreu um erro ao salvar o equipamento.');
     }
-
-    setIsModalOpen(false);
-    setEditingEquip(null);
-    setIsSelectingCoords(false);
   };
 
   const openAddModal = () => {
@@ -440,6 +484,23 @@ export default function MapComponent({
   const openEditModal = (equip: Equipment) => {
     setEditingEquip(equip);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteEquipment = async (id: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
+    
+    const { error } = await supabase
+      .from('equipments')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting equipment:', error);
+      alert('Erro ao excluir equipamento');
+      return;
+    }
+
+    setEquipments((prev: Equipment[]) => prev.filter(e => e.id !== id));
   };
 
   return (
@@ -564,7 +625,13 @@ export default function MapComponent({
               isExpanded={isExpanded}
               viewMode={viewMode}
             />
-            <MarkerClusterer data={filteredData} onEdit={openEditModal} />
+            <MarkerClusterer 
+              data={filteredData} 
+              onEdit={openEditModal} 
+              visitHistory={visitHistory || []}
+              onDeleteEquip={onEquipDeleted || handleDeleteEquipment}
+              onDeleteVisit={onVisitDeleted || (() => {})}
+            />
           </MapContainer>
         ) : (
           <div className="h-full overflow-y-auto p-6 space-y-4">
@@ -595,6 +662,12 @@ export default function MapComponent({
                       >
                         <Edit2 className="w-3 h-3" />
                       </button>
+                      <button 
+                        onClick={() => handleDeleteEquipment(item.id as number)}
+                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 transition-all shadow-sm border border-transparent hover:border-red-100"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
@@ -603,6 +676,13 @@ export default function MapComponent({
                     <p className="col-span-2"><span className="font-bold text-slate-700">Endereço:</span> {item.address}</p>
                     {item.contact && <p><span className="font-bold text-slate-700">Contato:</span> {item.contact}</p>}
                     {item.reference && <p><span className="font-bold text-slate-700">Referência:</span> {item.reference}</p>}
+                    {item.operatingHours && <p><span className="font-bold text-slate-700">Horário:</span> {item.operatingHours}</p>}
+                    {item.socialWorker && <p><span className="font-bold text-slate-700">A. Social:</span> {item.socialWorker}</p>}
+                    {(item.intern1 || item.intern2) && (
+                      <p className="col-span-2">
+                        <span className="font-bold text-slate-700">Estagiárias:</span> {[item.intern1, item.intern2].filter(Boolean).join(', ')}
+                      </p>
+                    )}
                     {item.observations && <p className="col-span-2"><span className="font-bold text-slate-700">Observações:</span> {item.observations}</p>}
                   </div>
                   <div className="mt-4 flex gap-2">
@@ -753,10 +833,24 @@ export default function MapComponent({
                   <textarea 
                     value={editingEquip.observations || ''}
                     onChange={e => setEditingEquip({ ...editingEquip, observations: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all text-sm min-h-[80px]"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all text-sm min-h-[60px]"
                     placeholder="Informações adicionais sobre o equipamento..."
                   />
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Horário de Funcionamento</label>
+                  <div className="relative group">
+                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                    <input 
+                      value={editingEquip.operatingHours || ''}
+                      onChange={e => setEditingEquip({ ...editingEquip, operatingHours: e.target.value })}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all text-sm"
+                      placeholder="Ex: 08:00 às 17:00"
+                    />
+                  </div>
+                </div>
+
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Localização (Lat, Lng)</label>
@@ -782,15 +876,6 @@ export default function MapComponent({
                   </div>
                 </div>
 
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Observações</label>
-                  <textarea 
-                    value={editingEquip.observations}
-                    onChange={e => setEditingEquip({ ...editingEquip, observations: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition-all text-sm min-h-[100px]"
-                    placeholder="Informações adicionais importantes..."
-                  />
-                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-top border-slate-100">
@@ -825,9 +910,9 @@ export default function MapComponent({
                   <ClipboardList className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">Scribere • <span className="text-emerald-600 italic serif font-bold">Visita Técnica</span></h2>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight text-emerald-600 italic serif font-bold">Visita Técnica</h2>
                   <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-[0.2em] mt-1">
-                    Registro de campo Regional 11
+                    Registro de campo
                   </p>
                 </div>
               </div>
@@ -852,31 +937,174 @@ export default function MapComponent({
                     className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-emerald-100 focus:bg-white outline-none text-sm font-bold transition-all"
                   />
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 ml-1">Responsável Técnico</label>
-                  <div className="relative group">
-                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
-                    <select 
-                      value={activeVisit.professional}
-                      onChange={e => setActiveVisit({ ...activeVisit, professional: e.target.value })}
-                      className="w-full pl-12 pr-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-emerald-100 focus:bg-white outline-none text-sm appearance-none font-bold transition-all"
-                    >
-                      {professionals.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
+                <div className="space-y-4 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 ml-1">Responsáveis Técnicos</label>
+                      <button 
+                        type="button"
+                        onClick={() => setIsEditingProfs(!isEditingProfs)}
+                        className="p-1 text-slate-400 hover:text-emerald-600 transition-colors"
+                        title="Editar lista de profissionais"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-400 font-bold">Pode selecionar vários</span>
+                  </div>
+
+                  {isEditingProfs && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 space-y-3 mb-2 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          placeholder="Nome do novo profissional..."
+                          value={newProfName}
+                          onChange={(e) => setNewProfName(e.target.value)}
+                          className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-emerald-500 outline-none"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            if (newProfName.trim()) {
+                              setProfessionals([...professionals, newProfName.trim()]);
+                              setNewProfName('');
+                            }
+                          }}
+                          className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {professionals.map(p => (
+                          <div key={p} className="flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-slate-200 text-[10px] font-medium text-slate-600">
+                            {p}
+                            <button 
+                              type="button"
+                              onClick={() => setProfessionals(professionals.filter(prof => prof !== p))}
+                              className="text-slate-400 hover:text-red-500"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    {professionals.map(prof => {
+                      const isSelected = activeVisit.professionals?.includes(prof);
+                      return (
+                        <button
+                          key={prof}
+                          type="button"
+                          onClick={() => {
+                            const current = activeVisit.professionals || [];
+                            const updated = isSelected 
+                              ? current.filter(p => p !== prof) 
+                              : [...current, prof];
+                            setActiveVisit({ ...activeVisit, professionals: updated });
+                          }}
+                          className={`flex items-center gap-3 p-4 rounded-2xl text-sm font-bold transition-all border-2 ${
+                            isSelected 
+                              ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-lg shadow-emerald-100' 
+                              : 'bg-white border-slate-100 text-slate-400 hover:border-emerald-100 hover:text-emerald-600'
+                          }`}
+                        >
+                          {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-600" /> : <Square className="w-5 h-5 opacity-20" />}
+                          {prof}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 ml-1">Estagiária em Serviço</label>
-                  <div className="relative group">
-                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
-                    <select 
-                      value={activeVisit.intern}
-                      onChange={e => setActiveVisit({ ...activeVisit, intern: e.target.value })}
-                      className="w-full pl-12 pr-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-emerald-100 focus:bg-white outline-none text-sm appearance-none font-bold transition-all"
+              </div>
+
+
+
+              {/* Interns - Multi Selection */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 ml-1">Estagiárias Participantes</label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsEditingInterns(!isEditingInterns)}
+                      className="p-1 text-slate-400 hover:text-emerald-600 transition-colors"
+                      title="Editar lista de estagiárias"
                     >
-                      {interns.map(i => <option key={i} value={i}>{i}</option>)}
-                    </select>
+                      <Edit2 className="w-3 h-3" />
+                    </button>
                   </div>
+                  <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-400 font-bold">Pode selecionar várias</span>
+                </div>
+
+                {isEditingInterns && (
+                  <div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 space-y-3 mb-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        placeholder="Nome da nova estagiária..."
+                        value={newInternName}
+                        onChange={(e) => setNewInternName(e.target.value)}
+                        className="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:border-emerald-500 outline-none"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (newInternName.trim()) {
+                            setInterns([...interns, newInternName.trim()]);
+                            setNewInternName('');
+                          }
+                        }}
+                        className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {interns.map(i => (
+                        <div key={i} className="flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-slate-200 text-[10px] font-medium text-slate-600">
+                          {i}
+                          <button 
+                            type="button"
+                            onClick={() => setInterns(interns.filter(intern => intern !== i))}
+                            className="text-slate-400 hover:text-red-500"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {interns.map(intern => {
+                    const isSelected = activeVisit.interns?.includes(intern);
+                    return (
+                      <button
+                        key={intern}
+                        type="button"
+                        onClick={() => {
+                          const current = activeVisit.interns || [];
+                          const updated = isSelected 
+                            ? current.filter(i => i !== intern) 
+                            : [...current, intern];
+                          setActiveVisit({ ...activeVisit, interns: updated });
+                        }}
+                        className={`flex items-center gap-3 p-4 rounded-2xl text-sm font-bold transition-all border-2 ${
+                          isSelected 
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-lg shadow-emerald-100' 
+                            : 'bg-white border-slate-100 text-slate-400 hover:border-emerald-100 hover:text-emerald-600'
+                        }`}
+                      >
+                        {isSelected ? <CheckSquare className="w-5 h-5 text-emerald-600" /> : <Square className="w-5 h-5 opacity-20" />}
+                        {intern}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
